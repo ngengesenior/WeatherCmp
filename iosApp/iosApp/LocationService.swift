@@ -8,10 +8,12 @@
 
 import Foundation
 import CoreLocation
+@objcMembers
 class LocationService:NSObject,CLLocationManagerDelegate {
     private let locationManager = CLLocationManager()
+    private let geocodingService = GeocodingService()
+    private var completion:((Result<CLPlacemark,Error>) -> Void)?
     
-    private var completion:((Result<CLLocationCoordinate2D,Error>) -> Void)?
     
     override init() {
         super.init()
@@ -19,7 +21,7 @@ class LocationService:NSObject,CLLocationManagerDelegate {
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
     }
     
-    func requestLocation(completion: @escaping (Result<CLLocationCoordinate2D, Error>)-> Void) {
+    func requestCurrentLocation(completion: @escaping (Result<CLPlacemark, Error>)-> Void) {
         self.completion = completion
         locationManager.requestWhenInUseAuthorization()
         locationManager.startUpdatingLocation()
@@ -28,8 +30,15 @@ class LocationService:NSObject,CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         if let location = locations.first {
             locationManager.startUpdatingLocation()
-            completion?(.success(location.coordinate))
-            completion = nil
+            geocodingService.reverseGeocodeLocation(location) {result in
+                switch result {
+                case .success(let placemark):self.completion?(.success(placemark))
+                    
+                case .failure(let error): self.completion?(.failure(error))
+                }
+                self.completion = nil
+            
+            }
         }
     }
     
